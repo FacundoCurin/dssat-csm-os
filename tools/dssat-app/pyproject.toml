@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dssat-app"
+version = "0.1.0"
+description = "Driver y GUI en Python para corridas seasonal/sequence y barridos de sensibilidad en DSSAT-CSM (maiz, trigo, soja)."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "BSD-3-Clause" }
+authors = [{ name = "DSSAT-CSM community" }]
+dependencies = [
+    "pandas>=1.3",
+]
+
+[project.optional-dependencies]
+# UI web
+ui = ["streamlit>=1.25", "matplotlib>=3.5"]
+# Desarrollo / pruebas
+dev = ["pytest>=7.0"]
+
+[project.scripts]
+dssat-app = "dssat_app.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["dssat_app*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
