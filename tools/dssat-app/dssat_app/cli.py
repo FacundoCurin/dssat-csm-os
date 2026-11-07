@@ -25,6 +25,7 @@ from .crops import CROPS, RUN_MODES, crop_by_filex_ext, get_crop
 from .filex import FACTORS, FileX
 from .sweep import Sweep
 from .sequence import SequenceExperiment
+from .weather import split_multiyear
 
 
 def _parse_factor(spec: str):
@@ -119,6 +120,14 @@ def cmd_sequence(args) -> int:
     return 0
 
 
+def cmd_weather_split(args) -> int:
+    files = split_multiyear(args.wth, args.out, wsta=args.wsta)
+    print(f"{len(files)} archivos anuales escritos en {args.out}")
+    if files:
+        print(f"  {files[0].name} ... {files[-1].name}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="dssat-app", description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -166,6 +175,13 @@ def build_parser() -> argparse.ArgumentParser:
     pq.add_argument("--rotation-only", action="store_true",
                     help="solo mostrar la rotacion, sin correr")
     pq.set_defaults(func=cmd_sequence)
+
+    pw = sub.add_parser("weather-split",
+                        help="Partir una serie larga .WTH en archivos anuales")
+    pw.add_argument("wth", help="archivo .WTH multi-anual")
+    pw.add_argument("--out", required=True, help="carpeta Weather/ de salida")
+    pw.add_argument("--wsta", help="codigo de estacion de 4 letras (opcional)")
+    pw.set_defaults(func=cmd_weather_split)
 
     return p
 

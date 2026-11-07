@@ -37,7 +37,8 @@ dssat_app/
   outputs.py  Parseo de *.OUT (Summary + series diarias)
   sweep.py    Motor de barrido seasonal (análisis tipo sensibilidad)
   sequence.py Rotaciones multi-cultivo (modo Q): maíz→soja→trigo
-  cli.py      Línea de comandos (info / batch / sweep / sequence)
+  weather.py  Parte series largas .WTH en archivos anuales DSSAT
+  cli.py      Línea de comandos (info / batch / sweep / sequence / weather-split)
 app/
   streamlit_app.py   Interfaz web
 tests/        Suite con FileX de maíz (.MZX) y rotación (.SQX) de ejemplo
@@ -112,6 +113,21 @@ Qué resuelve el modo secuencia (todo verificado contra CSM):
   de carbono orgánico del suelo a lo largo de la rotación.
 - Si un cultivar del experimento no está en tu archivo de genotipo, CSM aborta
   ("Error in Cultivar entry"): remapealo con `set_cultivar`/`--cultivar`.
+
+### Clima: series largas → archivos anuales
+
+CSM cruza bien el 31-dic (campañas de primavera a otoño del año siguiente)
+sólo con **archivos anuales** `<WSTA><AA>01.WTH`; una única serie larga suele
+cortar en fin de año (error 29 / salidas -99). Para partir una serie:
+
+```bash
+dssat-app weather-split RAPE8442.WTH --out "$HOME/dssathome/Weather" --wsta RAPE
+```
+
+```python
+from dssat_app import split_multiyear
+split_multiyear("RAPE.WTH", "~/dssathome/Weather", wsta="RAPE")
+```
 
 ## Uso (web)
 
