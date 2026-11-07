@@ -24,6 +24,7 @@ from . import batch as batch_mod
 from .crops import CROPS, RUN_MODES, crop_by_filex_ext, get_crop
 from .filex import FACTORS, FileX
 from .sweep import Sweep
+from .sequence import SequenceExperiment
 
 
 def _parse_factor(spec: str):
@@ -88,6 +89,36 @@ def cmd_sweep(args) -> int:
     return 0 if result.run.ok else 2
 
 
+def cmd_sequence(args) -> int:
+    seq = SequenceExperiment(args.sqx, trtno=args.trt)
+    rot = seq.rotation()
+    print(f"Rotacion: {len(rot)} componentes | cultivos: {seq.crops_used()}")
+    for key_val in (args.cultivar or []):
+        lvl, ingeno = key_val.split("=", 1)
+        seq.set_cultivar(int(lvl), ingeno.strip())
+    if args.rotation_only:
+        for c in rot:
+            print(f"  R{c.r:>2} {c.crop_code} {c.cultivar:<8} {c.name}")
+        return 0
+    res = seq.run(args.out, model=args.model, dssat_dir=args.dssat_dir,
+                  nyers=args.nyers, timeout=args.timeout)
+    if not res.run.ok:
+        print(f"CSM devolvio codigo {res.run.returncode}", file=sys.stderr)
+        if res.run.error_out:
+            print("ERROR.OUT:\n" + res.run.error_out, file=sys.stderr)
+        return 2
+    print(f"\nCampanias simuladas: {len(res.summary)}")
+    print("\nRinde medio por cultivo (kg/ha):")
+    print(res.yield_by_crop().to_string())
+    dc = res.soil_carbon_change()
+    if dc is not None:
+        print(f"\nCambio de C organico del suelo (OCTAM): {dc:+.0f} kg/ha")
+    csv = Path(args.out) / "secuencia_resultados.csv"
+    res.summary.to_csv(csv, index=False)
+    print(f"\nResultados guardados en {csv}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="dssat-app", description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -121,6 +152,20 @@ def build_parser() -> argparse.ArgumentParser:
     ps.add_argument("--design-only", action="store_true",
                     help="solo generar variantes y mostrar el diseno")
     ps.set_defaults(func=cmd_sweep)
+
+    pq = sub.add_parser("sequence", help="Corrida de secuencia/rotacion (modo Q)")
+    pq.add_argument("sqx", help="FileX de secuencia (.SQX)")
+    pq.add_argument("--trt", type=int, default=1)
+    pq.add_argument("--model")
+    pq.add_argument("--nyers", type=int, help="sobreescribir numero de anios")
+    pq.add_argument("--cultivar", action="append",
+                    help="remapear cultivar: nivelCU=INGENO (repetible)")
+    pq.add_argument("--out", default="./_seq")
+    pq.add_argument("--dssat-dir", dest="dssat_dir")
+    pq.add_argument("--timeout", type=float)
+    pq.add_argument("--rotation-only", action="store_true",
+                    help="solo mostrar la rotacion, sin correr")
+    pq.set_defaults(func=cmd_sequence)
 
     return p
 

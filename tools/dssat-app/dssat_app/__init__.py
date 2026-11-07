@@ -16,6 +16,8 @@ from .batch import BatchEntry, build_batch, write_batch
 from .runner import DssatRunner, RunResult, find_executable
 from .outputs import read_summary, read_daily, read_out_blocks
 from .sweep import Sweep, SweepDesign, SweepResult, SweepFactor
+from .sequence import (SequenceExperiment, SequenceResult, RotationComponent,
+                       CROP_CODE_ES)
 
 __version__ = "0.1.0"
 
@@ -26,5 +28,6 @@ __all__ = [
     "DssatRunner", "RunResult", "find_executable",
     "read_summary", "read_daily", "read_out_blocks",
     "Sweep", "SweepDesign", "SweepResult", "SweepFactor",
+    "SequenceExperiment", "SequenceResult", "RotationComponent", "CROP_CODE_ES",
     "__version__",
 ]

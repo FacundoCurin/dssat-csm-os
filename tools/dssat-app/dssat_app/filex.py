@@ -279,6 +279,26 @@ class FileX:
         self.lines[li] = new_line
         return self
 
+    def set_all(self, section: str, col: str,
+                value: Union[str, int, float], justify: str = "right") -> int:
+        """Setea ``col`` = ``value`` en TODAS las filas de TODAS las tablas de
+        la seccion que contengan esa columna. Devuelve cuantas celdas cambio.
+
+        Util para OUTPUTS de SIMULATION CONTROLS, que se repite por nivel de
+        simulacion (p. ej. forzar SUMRY=Y en todos los niveles)."""
+        sec = self._resolve_section(section)
+        changed = 0
+        for ti, tbl in enumerate(self.sections[sec]):
+            try:
+                tbl.col_index(col)
+            except KeyError:
+                continue
+            for pos in range(len(tbl.data_line_idxs)):
+                self.set(section, col, value, row=pos, table_index=ti,
+                         justify=justify)
+                changed += 1
+        return changed
+
     # ----- tratamientos -------------------------------------------------
     def treatment_pointer(self, trtno: int, pointer: str) -> int:
         """Nivel referenciado por un tratamiento para una columna puntero.

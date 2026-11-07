@@ -35,11 +35,12 @@ dssat_app/
   batch.py    Generación del DSSBatch.v48 (alineado a CSM_Main/CSM.for)
   runner.py   Ejecución del binario DSCSM0XX en un dir de trabajo
   outputs.py  Parseo de *.OUT (Summary + series diarias)
-  sweep.py    Motor de barrido (análisis tipo sensibilidad)
-  cli.py      Línea de comandos (info / batch / sweep)
+  sweep.py    Motor de barrido seasonal (análisis tipo sensibilidad)
+  sequence.py Rotaciones multi-cultivo (modo Q): maíz→soja→trigo
+  cli.py      Línea de comandos (info / batch / sweep / sequence)
 app/
   streamlit_app.py   Interfaz web
-tests/        Suite con un FileX de maíz de ejemplo (no requiere CSM)
+tests/        Suite con FileX de maíz (.MZX) y rotación (.SQX) de ejemplo
 ```
 
 ### Por qué así
@@ -80,6 +81,37 @@ dssat-app sweep UFGA8201.MZX --crop maize --trt 1 \
     --mode N --out ./_run --dssat-dir /opt/dssat \
     --input GAINESVL.WTH --input SOIL.SOL
 ```
+
+### Secuencias / rotaciones (modo Q)
+
+```bash
+# Ver la rotación de un experimento de secuencia
+dssat-app sequence MSKB8902.SQX --rotation-only
+
+# Correr la rotación maíz→soja→trigo (remapeando un cultivar ausente)
+dssat-app sequence MSKB8902.SQX --model MZCER048 --dssat-dir "$HOME/dssathome" \
+    --cultivar 6=IB0091 --out ./_seq
+```
+
+```python
+from dssat_app import SequenceExperiment
+
+seq = SequenceExperiment("MSKB8902.SQX", trtno=1)
+seq.set_cultivar(6, "IB0091")      # usar un cultivar presente en tu .CUL
+res = seq.run("./_seq", model="MZCER048", dssat_dir="~/dssathome")
+print(res.yield_by_crop())          # rinde medio por cultivo
+print(res.soil_carbon_change())     # evolución del C orgánico del suelo
+```
+
+Qué resuelve el modo secuencia (todo verificado contra CSM):
+- **Una línea de batch por componente de rotación** (`SQ`=R); con una sola
+  línea CSM repite el primer cultivo (monocultivo).
+- Fuerza `SUMRY=Y` y `FNAME=N` para que la salida sea `Summary.OUT` estándar
+  (con `FNAME=Y` se renombra a `<EXP>.OSU`).
+- Etiqueta cada campaña con su cultivo y resume rinde por cultivo y el cambio
+  de carbono orgánico del suelo a lo largo de la rotación.
+- Si un cultivar del experimento no está en tu archivo de genotipo, CSM aborta
+  ("Error in Cultivar entry"): remapealo con `set_cultivar`/`--cultivar`.
 
 ## Uso (web)
 
@@ -157,13 +189,15 @@ para que CSM encuentre `DSSATPRO.L48` y los directorios.
 ## Estado y hoja de ruta
 
 - [x] Núcleo FileX (leer/editar), batch N/Q/B, parser de salidas, barrido
-      factorial, CLI y UI. 23 tests en verde (no requieren CSM).
+      factorial, secuencias, CLI y UI. 29 tests en verde (no requieren CSM).
 - [x] **Corrida seasonal (N) real verificada** end-to-end con binario nativo
       Linux + `UFGA8201.MZX` (maíz, Gainesville 1982): barridos de fecha de
       siembra y densidad con respuestas agronómicas coherentes.
-- [ ] Modo **sequence (Q)** completo: edición de la sección de rotaciones
-      (`*TILLAGE AND ROTATIONS` / enlaces de secuencia) y armado de rotaciones
-      multi-cultivo maíz→trigo→soja.
+- [x] **Secuencia (Q) real verificada**: rotación maíz→soja→trigo (MSKB8902,
+      Kellogg, 27 años) corriendo con los 3 modelos de cultivo, estado de suelo
+      acoplado entre campañas y resumen de rinde por cultivo + carbono del suelo.
+- [ ] Construir una rotación nueva desde cero (insertar componentes/campañas),
+      no solo editar una existente.
 - [ ] Autodetección del `DSSATPRO`/`.CTR` y copia automática de clima/suelo.
 - [ ] Parseo multi-año (NYERS>1) con mapeo por `RUNNO` y agregados estadísticos.
 - [ ] Lectura de más salidas diarias (SoilWat, ET, N) y gráficos comparativos.
