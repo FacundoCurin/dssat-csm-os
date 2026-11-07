@@ -320,13 +320,16 @@ class Factor:
     pointer: str
     label_es: str
     justify: str = "right"
+    # columnas espejo en la misma seccion/nivel que reciben el mismo valor
+    # (p. ej. densidad: PPOP y PPOE deben ir juntas; CERES usa la emergida).
+    also_columns: Tuple[str, ...] = ()
 
 
 FACTORS: Dict[str, Factor] = {
     "pdate": Factor("pdate", "PLANTING DETAILS", "PDATE", "MP",
                     "Fecha de siembra (YYDDD)"),
     "ppop": Factor("ppop", "PLANTING DETAILS", "PPOP", "MP",
-                   "Densidad de plantas (pl/m2)"),
+                   "Densidad de plantas (pl/m2)", also_columns=("PPOE",)),
     "plrs": Factor("plrs", "PLANTING DETAILS", "PLRS", "MP",
                    "Espaciamiento entre hileras (cm)"),
     "pldp": Factor("pldp", "PLANTING DETAILS", "PLDP", "MP",

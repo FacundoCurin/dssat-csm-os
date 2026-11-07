@@ -126,10 +126,41 @@ La app **no incluye** el modelo ni los datos. Para corridas reales necesitás:
 Sin ejecutable, la app igual sirve para **generar y validar entradas** y para
 **analizar salidas** ya producidas.
 
+### Compilar DSSAT para Linux (verificado)
+
+```bash
+sudo apt-get install -y gfortran cmake make        # toolchain
+cd <raíz del repo dssat-csm-os>
+cmake -S . -B build -DCMAKE_INSTALL_PREFIX="$HOME/dssathome"
+cmake --build build -j
+cmake --install build            # arma $HOME/dssathome con DSSATPRO.L48 + Genotype + .CDE
+```
+
+Después se copian los datos (clima/suelo/experimento) y, si corresponde, tus
+genotipos calibrados dentro de `$HOME/dssathome/{Weather,Soil,Maize,Genotype}`.
+Al correr, pasá `dssat_dir="$HOME/dssathome"`: el runner exporta `DSSAT_HOME`
+para que CSM encuentre `DSSATPRO.L48` y los directorios.
+
+> **Nota:** el `.exe` de Windows (PE32+) no corre en Linux sin Wine; en Linux
+> conviene el binario nativo ELF que produce la compilación de arriba.
+
+### Detalles agronómicos que la app maneja por vos
+
+- **Acople de `SDATE`** (`couple_start=True`, por defecto): al barrer fecha de
+  siembra, baja el inicio de simulación a `min(SDATE original, siembra más
+  temprana)` para no disparar el error de CSM *"Planting date is defined prior
+  to the start of simulation date"* ni dejar eventos (riego/fertilización)
+  antes del inicio.
+- **Densidad** (`ppop`): setea `PPOP` **y** `PPOE` juntas, porque CERES usa la
+  población *emergida*; variar sólo `PPOP` no cambia el resultado.
+
 ## Estado y hoja de ruta
 
 - [x] Núcleo FileX (leer/editar), batch N/Q/B, parser de salidas, barrido
-      factorial, CLI y UI. 21 tests en verde (no requieren CSM).
+      factorial, CLI y UI. 23 tests en verde (no requieren CSM).
+- [x] **Corrida seasonal (N) real verificada** end-to-end con binario nativo
+      Linux + `UFGA8201.MZX` (maíz, Gainesville 1982): barridos de fecha de
+      siembra y densidad con respuestas agronómicas coherentes.
 - [ ] Modo **sequence (Q)** completo: edición de la sección de rotaciones
       (`*TILLAGE AND ROTATIONS` / enlaces de secuencia) y armado de rotaciones
       multi-cultivo maíz→trigo→soja.

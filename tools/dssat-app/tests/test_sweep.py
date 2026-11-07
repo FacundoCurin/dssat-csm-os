@@ -54,6 +54,25 @@ def test_fert_factor_edits_correct_level(tmp_path):
     assert fx.get("FERTILIZERS", "FAMN", level=1) == "0"
 
 
+def test_couple_start_sets_sdate(tmp_path):
+    # al barrer pdate con fechas antes del SDATE base (82057), SDATE debe
+    # bajar a la siembra mas temprana para no abortar CSM
+    sw = Sweep(MZX, crop="maize", trtno=1, couple_start=True)
+    sw.add_factor("pdate", ["82001", "82030", "82090"])
+    design = sw.build(tmp_path)
+    for name in design.variant_files:
+        fx = FileX.read(tmp_path / name)
+        assert fx.get("SIMULATION CONTROLS", "SDATE", level=1) == "82001"
+
+
+def test_couple_start_disabled_keeps_sdate(tmp_path):
+    sw = Sweep(MZX, crop="maize", trtno=1, couple_start=False)
+    sw.add_factor("pdate", ["82001"])
+    design = sw.build(tmp_path)
+    fx = FileX.read(tmp_path / design.variant_files[0])
+    assert fx.get("SIMULATION CONTROLS", "SDATE", level=1) == "82057"
+
+
 def test_unknown_factor_raises(tmp_path):
     sw = Sweep(MZX, crop="maize", trtno=1)
     with pytest.raises(KeyError):

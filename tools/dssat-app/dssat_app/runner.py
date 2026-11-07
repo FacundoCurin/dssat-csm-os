@@ -87,11 +87,14 @@ class DssatRunner:
     executable: Path
     work_dir: Path
     extra_input_dirs: List[Path] = field(default_factory=list)
+    dssat_home: Optional[Path] = None   # se exporta como $DSSAT_HOME al correr
 
     def __post_init__(self) -> None:
         self.executable = Path(self.executable)
         self.work_dir = Path(self.work_dir)
         self.work_dir.mkdir(parents=True, exist_ok=True)
+        if self.dssat_home is not None:
+            self.dssat_home = Path(self.dssat_home)
 
     @classmethod
     def locate(cls, work_dir: PathLike,
@@ -103,7 +106,8 @@ class DssatRunner:
                 "'dssat_dir' o defina $DSSAT_HOME, o compile el modelo con "
                 "CMake desde la raiz del repo."
             )
-        return cls(executable=exe, work_dir=Path(work_dir))
+        home = Path(dssat_dir) if dssat_dir else None
+        return cls(executable=exe, work_dir=Path(work_dir), dssat_home=home)
 
     def stage_file(self, src: PathLike) -> Path:
         """Copia un archivo de entrada al directorio de trabajo."""
@@ -120,9 +124,14 @@ class DssatRunner:
         if batch.parent.resolve() != self.work_dir.resolve():
             batch = self.stage_file(batch)
         cmd = [str(self.executable), model, mode, batch.name]
+        env = None
+        home = self.dssat_home or self.executable.parent
+        if home is not None:
+            env = dict(os.environ)
+            env.setdefault("DSSAT_HOME", str(home))
         proc = subprocess.run(
             cmd, cwd=str(self.work_dir), capture_output=True, text=True,
-            timeout=timeout,
+            timeout=timeout, env=env,
         )
         return RunResult(
             returncode=proc.returncode,

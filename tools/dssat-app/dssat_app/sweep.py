@@ -74,11 +74,16 @@ class Sweep:
     """Construye y ejecuta un barrido."""
 
     def __init__(self, base_filex: PathLike, crop: Union[str, Crop],
-                 model: Optional[str] = None, trtno: int = 1):
+                 model: Optional[str] = None, trtno: int = 1,
+                 couple_start: bool = True):
         self.base_filex = Path(base_filex)
         self.crop: Crop = crop if isinstance(crop, Crop) else get_crop(crop)
         self.model = model or self.crop.default_model
         self.trtno = trtno
+        # Si se barre la fecha de siembra, acoplar el inicio de simulacion
+        # (SDATE) a esa fecha para evitar el error de CSM "Planting date is
+        # defined prior to the start of simulation date".
+        self.couple_start = couple_start
         self.base = FileX.read(self.base_filex)
         self.factors: List[SweepFactor] = []
 
@@ -95,6 +100,9 @@ class Sweep:
         level_lists = [f.levels for f in self.factors]
         combos = list(itertools.product(*level_lists)) if level_lists else [()]
 
+        # fecha de inicio comun si se barre la siembra (ver _target_sdate)
+        target_sdate = self._target_sdate() if self.couple_start else None
+
         combinations: List[Dict] = []
         variant_files: List[str] = []
 
@@ -107,13 +115,57 @@ class Sweep:
                 lvl = self.base.treatment_pointer(self.trtno, fac.pointer)
                 fx.set(fac.section, fac.column, value, level=lvl,
                        justify=fac.justify)
+                for extra_col in fac.also_columns:
+                    fx.set(fac.section, extra_col, value, level=lvl,
+                           justify=fac.justify)
                 record[fac.key] = value
+            # acoplar inicio de simulacion (una fecha comun para todo el barrido)
+            if target_sdate is not None:
+                self._set_start_date(fx, target_sdate)
             name = _variant_name(idx, self.crop.filex_ext)
             fx.write(out_dir / name)
             combinations.append(record)
             variant_files.append(name)
 
         return SweepDesign(combinations=combinations, variant_files=variant_files)
+
+    def _target_sdate(self) -> Optional[str]:
+        """Fecha de inicio de simulacion a usar cuando se barre la siembra.
+
+        Regla: SDATE = min(SDATE original, fecha de siembra mas temprana del
+        barrido). Asi el inicio nunca queda despues de la siembra ni de un
+        evento ya definido (riego/fertilizacion), que es lo que hace abortar
+        a CSM. Devuelve None si no se barre 'pdate'.
+        """
+        pdate_levels: List[int] = []
+        for sf in self.factors:
+            if sf.factor.key == "pdate":
+                for v in sf.levels:
+                    try:
+                        pdate_levels.append(int(str(v)))
+                    except ValueError:
+                        pass
+        if not pdate_levels:
+            return None
+        target = min(pdate_levels)
+        try:
+            sm = self.base.treatment_pointer(self.trtno, "SM")
+            cur = int(self.base.get("SIMULATION CONTROLS", "SDATE", level=sm,
+                                    table_index=0))
+            target = min(target, cur)
+        except (KeyError, IndexError, ValueError):
+            pass
+        return f"{target:05d}"
+
+    def _set_start_date(self, fx: FileX, sdate: str) -> None:
+        """Pone SDATE (inicio de simulacion) en el nivel de SIMULATION
+        CONTROLS que usa el tratamiento. Silencioso si no existe la columna."""
+        try:
+            sm = self.base.treatment_pointer(self.trtno, "SM")
+            fx.set("SIMULATION CONTROLS", "SDATE", sdate, level=sm,
+                   table_index=0)
+        except (KeyError, IndexError, ValueError):
+            pass
 
     # ----- ejecucion ----------------------------------------------------
     def run(self, out_dir: PathLike, mode: str = "N",
