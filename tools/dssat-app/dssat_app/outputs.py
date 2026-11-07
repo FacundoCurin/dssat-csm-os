@@ -20,11 +20,9 @@ import pandas as pd
 PathLike = Union[str, Path]
 
 
-def _column_ends(header: str) -> List[int]:
-    return [m.end() - 1 for m in re.finditer(r"\S+", header)]
-
-
 def _split_row(line: str, ends: List[int], ncols: int) -> List[str]:
+    """Separa una fila usando el FIN de cada token del encabezado como limite
+    derecho de columna (mismo criterio que filex)."""
     out: List[str] = []
     for i in range(ncols):
         start = 0 if i == 0 else ends[i - 1] + 1

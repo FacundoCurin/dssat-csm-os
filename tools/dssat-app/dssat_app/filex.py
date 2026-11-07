@@ -53,8 +53,13 @@ def _column_ends(header: str) -> List[int]:
     """Posiciones (indice 0-based del ultimo caracter) de cada token del header.
 
     Para ``@P PDATE EDATE`` devuelve el indice de ``P`` (en ``@P``), de la
-    ``E`` final de ``PDATE``, etc. Esos indices definen el limite derecho de
-    cada columna de datos.
+    ``E`` final de ``PDATE``, etc. Esos indices definen el limite DERECHO de
+    cada columna. Funciona para valores alineados a la derecha (numericos) y
+    para la tabla de tratamientos (encabezados de 1 letra en campos de 2).
+
+    Limitacion: para campos de texto alineados a la izquierda cuyo dato excede
+    el ancho del rotulo (p. ej. ID_SOIL, dato de 10 car. vs rotulo de 7), la
+    lectura trunca; ``set`` lo compensa al escribir (ver alli).
     """
     ends: List[int] = []
     for m in re.finditer(r"\S+", header):
@@ -191,7 +196,9 @@ class FileX:
         """Devuelve el indice (en tbl.data_line_idxs) de la fila cuyo nivel
         (primera columna) == level."""
         for pos, li in enumerate(tbl.data_line_idxs):
-            first = self.lines[li][: tbl._ends[0] + 1].strip()
+            s, e = _field_slice(tbl._ends, 0, len(self.lines[li]),
+                                len(tbl.columns) == 1)
+            first = self.lines[li][s:e].strip()
             try:
                 if int(first) == int(level):
                     return pos
@@ -205,7 +212,9 @@ class FileX:
     def levels_in(self, tbl: Table) -> List[int]:
         out: List[int] = []
         for li in tbl.data_line_idxs:
-            first = self.lines[li][: tbl._ends[0] + 1].strip()
+            s, e = _field_slice(tbl._ends, 0, len(self.lines[li]),
+                                len(tbl.columns) == 1)
+            first = self.lines[li][s:e].strip()
             try:
                 out.append(int(first))
             except ValueError:
@@ -242,6 +251,17 @@ class FileX:
             out.append(d)
         return out
 
+    def _next_token_start(self, tbl: Table, ci: int) -> Optional[int]:
+        """Posicion (0-based) donde empieza el token del encabezado siguiente a
+        la columna ``ci``; None si ``ci`` es la ultima. Sirve para delimitar el
+        borde derecho real de un campo de texto mas ancho que su rotulo."""
+        header = self.lines[tbl.header_line_idx]
+        starts = [m.start() for m in re.finditer(r"\S+", header)]
+        nxt = ci + 1
+        if nxt < len(starts):
+            return starts[nxt]
+        return None
+
     # ----- edicion ------------------------------------------------------
     def set(self, section: str, col: str, value: Union[str, int, float],
             level: Optional[int] = None, row: int = 0, table_index: int = 0,
@@ -268,14 +288,35 @@ class FileX:
             new_field = sval if justify == "left" else sval.rjust(width)
             new_line = line[:start] + new_field
         else:
+            eff_stop = stop
             if len(sval) > width:
-                raise ValueError(
-                    f"El valor '{sval}' ({len(sval)} car.) no entra en la "
-                    f"columna '{col}' (ancho {width}) de la seccion "
-                    f"'{section}'."
-                )
-            new_field = sval.ljust(width) if justify == "left" else sval.rjust(width)
-            new_line = line[:start] + new_field + line[stop:]
+                # Campos de texto alineados a la izquierda cuyo dato excede el
+                # rotulo (p. ej. ID_SOIL: dato de 10 car., rotulo de 7). El
+                # borde real es el INICIO de la columna siguiente. Esto no
+                # aplica a numericos (justify='right'): si no entran, es error.
+                next_start = self._next_token_start(tbl, ci)
+                if justify == "left" and next_start is not None \
+                        and len(sval) <= next_start - start:
+                    eff_stop = next_start
+                else:
+                    raise ValueError(
+                        f"El valor '{sval}' ({len(sval)} car.) no entra en la "
+                        f"columna '{col}' (ancho {width}) de la seccion "
+                        f"'{section}'."
+                    )
+            # preservar el margen izquierdo original del dato (separador con la
+            # columna previa) al escribir texto; para numericos se rellena a la
+            # derecha como siempre.
+            field_text = line[start:eff_stop]
+            lead = len(field_text) - len(field_text.lstrip(" "))
+            if justify == "left":
+                if len(sval) > eff_stop - start - lead:
+                    lead = 0  # no hay lugar con el margen; pegar al inicio
+                body = sval.ljust(eff_stop - start - lead)
+                new_field = (" " * lead) + body
+            else:
+                new_field = sval.rjust(eff_stop - start)
+            new_line = line[:start] + new_field + line[eff_stop:]
         self.lines[li] = new_line
         return self
 

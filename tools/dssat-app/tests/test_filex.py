@@ -62,6 +62,20 @@ def test_set_rejects_overflow(fx):
         fx.set("PLANTING DETAILS", "PPOP", "1234567", level=1)
 
 
+def test_set_wide_text_field(fx):
+    # ID_SOIL: el dato (10 car.) es mas ancho que el rotulo 'ID_SOIL' (7);
+    # debe entrar extendiendo hasta la columna siguiente, sin pisar vecinos.
+    li = fx.table("FIELDS").data_line_idxs[0]
+    before_len = len(fx.lines[li])
+    last_tok_before = fx.lines[li].split()[-1]        # FLNAME (ultimo token)
+    wsta_before = fx.get("FIELDS", "WSTA", level=1)
+    fx.set("FIELDS", "ID_SOIL", "WI_PLAR020", level=1, justify="left")
+    assert len(fx.lines[li]) == before_len            # no corre la linea
+    assert fx.get("FIELDS", "WSTA", level=1) == wsta_before   # vecino izq. intacto
+    assert "WI_PLAR020" in fx.lines[li]               # valor completo presente
+    assert fx.lines[li].split()[-1] == last_tok_before  # FLNAME (der.) intacto
+
+
 def test_roundtrip_string(fx):
     txt = fx.to_string()
     fx2 = FileX.from_string(txt)

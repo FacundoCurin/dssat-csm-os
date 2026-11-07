@@ -186,6 +186,28 @@ para que CSM encuentre `DSSATPRO.L48` y los directorios.
 - **Densidad** (`ppop`): setea `PPOP` **y** `PPOE` juntas, porque CERES usa la
   población *emergida*; variar sólo `PPOP` no cambia el resultado.
 
+## Relocalizar un experimento a otro sitio (ej. Pergamino)
+
+Verificado: tomar un FileX, apuntarlo a otra estación de clima + suelo + tu
+cultivar, y correr. El editor maneja el `ID_SOIL` (10 car., más ancho que su
+rótulo) sin pisar columnas vecinas.
+
+```python
+from dssat_app.filex import FileX
+fx = FileX.read("UFGA8201.MZX")
+fx.set("FIELDS", "WSTA", "CNPE", level=1, justify="left")        # Pergamino
+fx.set("FIELDS", "ID_SOIL", "WI_PLAR020", level=1, justify="left")
+fx.set("CULTIVARS", "INGENO", "UAIC10", level=1)                 # DK 682 (FAUBA)
+fx.set_all("SIMULATION CONTROLS", "IRRIG", "N")                  # secano
+fx.set_all("SIMULATION CONTROLS", "FERTI", "A")                  # N automático
+fx.write("PERGbase.MZX")
+# luego: Sweep("PERGbase.MZX", crop="maize", ...).add_factor("pdate", [...]).run(...)
+```
+
+> Para rinde absoluto realista en tu zona hay que calibrar condiciones
+> iniciales (agua/N del suelo) y manejo con datos locales; el flujo y la
+> respuesta relativa (fecha de siembra, densidad, N) ya funcionan.
+
 ## Estado y hoja de ruta
 
 - [x] Núcleo FileX (leer/editar), batch N/Q/B, parser de salidas, barrido
@@ -196,6 +218,9 @@ para que CSM encuentre `DSSATPRO.L48` y los directorios.
 - [x] **Secuencia (Q) real verificada**: rotación maíz→soja→trigo (MSKB8902,
       Kellogg, 27 años) corriendo con los 3 modelos de cultivo, estado de suelo
       acoplado entre campañas y resumen de rinde por cultivo + carbono del suelo.
+- [x] **Relocalización a Pergamino verificada**: clima real `CNPE` (1967–2007)
+      + suelo local `WI_PLAR020` + cultivar argentino, con barrido de fecha de
+      siembra funcionando.
 - [ ] Construir una rotación nueva desde cero (insertar componentes/campañas),
       no solo editar una existente.
 - [ ] Autodetección del `DSSATPRO`/`.CTR` y copia automática de clima/suelo.
