@@ -74,14 +74,18 @@ def split_multiyear(src: PathLike, out_dir: PathLike,
     if len(station) != 4:
         station = (station + "XXXX")[:4]
 
-    # agrupar por anio (primeros digitos del campo DATE)
+    # agrupar por anio a partir del campo DATE. Puede venir como YYYYDDD (7
+    # digitos) o YYDDD (5); algunos archivos pierden los ceros a la izquierda
+    # cerca del anio 2000 ("00001"->"1", "01001"->"1001"), asi que se rellena.
     by_year: dict = {}
     for d in data:
         token = d.split()[0]
-        if len(token) >= 7:
-            year = int(token[:4])
-        else:                       # YYDDD -> 2 digitos de anio
-            yy = int(token[:2])
+        if len(token) >= 6:
+            t = token.zfill(7)
+            year = int(t[:4])
+        else:                       # YYDDD (posibles ceros perdidos)
+            t = token.zfill(5)
+            yy = int(t[:2])
             year = 1900 + yy if yy > 30 else 2000 + yy
         by_year.setdefault(year, []).append(d)
 
