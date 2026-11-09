@@ -27,3 +27,17 @@ def test_split_preserves_header_and_rows(tmp_path):
 def test_station_inferred_from_header(tmp_path):
     files = split_multiyear(FIX, tmp_path)   # sin wsta -> INSI del encabezado
     assert all(p.name.startswith("TEST") for p in files)
+
+
+def test_fill_srad(tmp_path):
+    from dssat_app.weather import fill_srad
+    src = Path(__file__).parent / "fixtures" / "GAPS.WTH"
+    out = tmp_path / "filled.WTH"
+    p, n = fill_srad(src, out, lat=-33.0)
+    assert n == 2                      # dos días con SRAD=-99
+    text = out.read_text(encoding="latin-1")
+    # ninguna línea de datos queda con SRAD -99
+    for l in text.splitlines():
+        if l.strip()[:4] == "2010":
+            srad = float(l.split()[1])
+            assert srad > 0

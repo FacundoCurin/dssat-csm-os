@@ -25,7 +25,7 @@ from .crops import CROPS, RUN_MODES, crop_by_filex_ext, get_crop
 from .filex import FACTORS, FileX
 from .sweep import Sweep
 from .sequence import SequenceExperiment
-from .weather import split_multiyear
+from .weather import split_multiyear, fill_srad
 
 
 def _parse_factor(spec: str):
@@ -128,6 +128,12 @@ def cmd_weather_split(args) -> int:
     return 0
 
 
+def cmd_weather_fill(args) -> int:
+    p, n = fill_srad(args.wth, args.out, lat=args.lat, kr=args.kr)
+    print(f"{n} días de SRAD rellenados -> {p}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="dssat-app", description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -182,6 +188,15 @@ def build_parser() -> argparse.ArgumentParser:
     pw.add_argument("--out", required=True, help="carpeta Weather/ de salida")
     pw.add_argument("--wsta", help="codigo de estacion de 4 letras (opcional)")
     pw.set_defaults(func=cmd_weather_split)
+
+    pf = sub.add_parser("weather-fill",
+                        help="Rellenar radiación (SRAD) faltante vía Hargreaves")
+    pf.add_argument("wth", help="archivo .WTH")
+    pf.add_argument("--out", help="salida (por defecto sobrescribe)")
+    pf.add_argument("--lat", type=float, help="latitud (si no está en el header)")
+    pf.add_argument("--kr", type=float, default=0.16,
+                    help="coef. Hargreaves (0.16 continental, 0.19 costero)")
+    pf.set_defaults(func=cmd_weather_fill)
 
     return p
 

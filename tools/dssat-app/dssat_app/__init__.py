@@ -18,7 +18,7 @@ from .outputs import read_summary, read_daily, read_out_blocks
 from .sweep import Sweep, SweepDesign, SweepResult, SweepFactor
 from .sequence import (SequenceExperiment, SequenceResult, RotationComponent,
                        CROP_CODE_ES)
-from .weather import split_multiyear
+from .weather import split_multiyear, fill_srad
 
 __version__ = "0.1.0"
 
@@ -30,6 +30,6 @@ __all__ = [
     "read_summary", "read_daily", "read_out_blocks",
     "Sweep", "SweepDesign", "SweepResult", "SweepFactor",
     "SequenceExperiment", "SequenceResult", "RotationComponent", "CROP_CODE_ES",
-    "split_multiyear",
+    "split_multiyear", "fill_srad",
     "__version__",
 ]

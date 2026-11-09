@@ -15,11 +15,40 @@ Formato de fecha soportado en la columna DATE: ``YYYYDDD`` (7 digitos) o
 
 from __future__ import annotations
 
+import math
 import re
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import List, Optional, Tuple, Union
 
 PathLike = Union[str, Path]
+
+
+def _extraterrestrial_radiation(lat_deg: float, doy: int) -> float:
+    """Radiacion extraterrestre Ra (MJ/m2/dia) para latitud y dia juliano."""
+    phi = math.radians(lat_deg)
+    dr = 1 + 0.033 * math.cos(2 * math.pi / 365 * doy)
+    dec = 0.409 * math.sin(2 * math.pi / 365 * doy - 1.39)
+    x = -math.tan(phi) * math.tan(dec)
+    x = max(-1.0, min(1.0, x))
+    ws = math.acos(x)
+    ra = (24 * 60 / math.pi) * 0.0820 * dr * (
+        ws * math.sin(phi) * math.sin(dec)
+        + math.cos(phi) * math.cos(dec) * math.sin(ws))
+    return max(ra, 0.0)
+
+
+def _parse_latlon_header(header: List[str]) -> Optional[float]:
+    """Latitud (grados) de la linea @INSI ... LAT ..."""
+    for i, ln in enumerate(header):
+        if ln.lstrip().upper().startswith("@") and "LAT" in ln.upper():
+            for nxt in header[i + 1:]:
+                toks = nxt.split()
+                if len(toks) >= 2:
+                    try:
+                        return float(toks[1])
+                    except ValueError:
+                        continue
+    return None
 
 
 def _station_from_header(header_lines: List[str]) -> Optional[str]:
@@ -98,3 +127,85 @@ def split_multiyear(src: PathLike, out_dir: PathLike,
             f.write(hdr_text + "\n" + date_header + "\n" + "\n".join(rows) + "\n")
         written.append(fn)
     return written
+
+
+def fill_srad(src: PathLike, out: Optional[PathLike] = None,
+              lat: Optional[float] = None, kr: float = 0.16,
+              missing: float = -90.0) -> Tuple[Path, int]:
+    """Rellena la radiacion solar faltante (SRAD <= -90) estimandola con
+    Hargreaves: SRAD = kr * sqrt(Tmax - Tmin) * Ra(lat, dia).
+
+    kr ~ 0.16 (continental) a 0.19 (costero). Devuelve (ruta, nº rellenados).
+    Escribe sobre ``out`` (o sobre ``src`` si out es None).
+    """
+    src = Path(src)
+    out = Path(out) if out else src
+    lines = src.read_text(encoding="latin-1").split("\n")
+
+    header: List[str] = []
+    date_idx = None
+    cols: List[str] = []
+    out_lines: List[str] = []
+    filled = 0
+    in_data = False
+    for ln in lines:
+        s = ln.rstrip("\r")
+        stripped = s.lstrip()
+        if not in_data and stripped[:1] == "@":
+            toks = stripped[1:].split()
+            if toks and toks[0].upper() == "DATE":
+                cols = ["DATE"] + toks[1:]
+                date_idx = 0
+                in_data = True
+                out_lines.append(s)
+                continue
+        if not in_data:
+            header.append(s)
+            out_lines.append(s)
+            continue
+        if not (s.strip() and s.lstrip()[0].isdigit()):
+            out_lines.append(s)
+            continue
+        parts = s.split()
+        try:
+            ci_s = cols.index("SRAD"); ci_x = cols.index("TMAX"); ci_n = cols.index("TMIN")
+        except ValueError:
+            out_lines.append(s); continue
+        try:
+            srad = float(parts[ci_s])
+        except (ValueError, IndexError):
+            out_lines.append(s); continue
+        if srad <= missing:
+            if lat is None:
+                lat = _parse_latlon_header(header) or -33.0
+            token = parts[date_idx]
+            doy = int(token.zfill(5)[-3:]) if len(token) <= 5 else int(token.zfill(7)[-3:])
+            try:
+                tmax = float(parts[ci_x]); tmin = float(parts[ci_n])
+                dt = max(tmax - tmin, 0.0)
+                ra = _extraterrestrial_radiation(lat, doy)
+                est = round(max(kr * math.sqrt(dt) * ra, 0.5), 1)
+                # reemplazar el token SRAD preservando ancho aproximado
+                w = len(parts[ci_s])
+                parts[ci_s] = f"{est:.1f}".rjust(w)
+                out_lines.append(_rejoin(s, parts, cols))
+                filled += 1
+                continue
+            except (ValueError, IndexError):
+                pass
+        out_lines.append(s)
+
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text("\n".join(out_lines), encoding="latin-1")
+    return out, filled
+
+
+def _rejoin(original: str, parts: List[str], cols: List[str]) -> str:
+    """Reescribe la fila de datos con los valores (posiblemente editados),
+    en formato de ancho fijo legible por DSSAT."""
+    date = parts[0]
+    rest = parts[1:]
+    out = f"{date:>5}"
+    for v in rest:
+        out += f" {v:>5}"
+    return out
