@@ -13,6 +13,9 @@ factorial, correr todo en batch y comparar las salidas.
 > Vive en `tools/dssat-app/`, aislado del árbol Fortran del modelo. No modifica
 > el código de CSM.
 
+📦 **Instalación paso a paso:** [`INSTALL.md`](INSTALL.md) ·
+📊 **Ejemplos de resultados (Pampa):** [`EJEMPLOS.md`](EJEMPLOS.md)
+
 ## Qué hace
 
 1. **Generar entradas** — lee y edita el FileX conservando el formato de
