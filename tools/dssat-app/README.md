@@ -14,6 +14,7 @@ factorial, correr todo en batch y comparar las salidas.
 > el código de CSM.
 
 📦 **Instalación paso a paso:** [`INSTALL.md`](INSTALL.md) ·
+🌐 **Desplegar la app web:** [`DEPLOY.md`](DEPLOY.md) ·
 📊 **Ejemplos de resultados (Pampa):** [`EJEMPLOS.md`](EJEMPLOS.md)
 
 ## Qué hace
