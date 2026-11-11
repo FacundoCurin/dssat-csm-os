@@ -31,11 +31,39 @@ st.caption("Armá los manejos (fecha, densidad, N, cultivar, riego), corré el "
 
 CROP_DIR = {"maize": "Maize", "wheat": "Wheat", "soybean": "Soybean"}
 
+
+def detect_dssat_home() -> str:
+    """Busca una instalación de DSSAT en ubicaciones habituales."""
+    env = os.environ.get("DSSAT_HOME")
+    if env and Path(env).exists():
+        return env
+    candidates = [
+        Path.home() / "dssathome",
+        *[Path(f"{d}:/DSSAT{v}") for d in ("C", "D")
+          for v in ("48", "47", "49", "46")],
+        Path("/opt/dssat"), Path("/usr/local/dssat"),
+        Path.home() / "DSSAT48", Path.home() / "dssat",
+    ]
+    for c in candidates:
+        try:
+            if c.exists() and (list(c.glob("DSCSM*")) or list(c.glob("dscsm*"))):
+                return str(c)
+        except OSError:
+            continue
+    return env or str(Path.home() / "dssathome")
+
+
 # ---------------------------------------------------------------- sidebar
 with st.sidebar:
     st.header("1 · Modelo y datos")
-    dssat_dir = st.text_input("Carpeta DSSAT (binario + datos)",
-                              value=os.environ.get("DSSAT_HOME", str(Path.home() / "dssathome")))
+    dssat_dir = st.text_input(
+        "Carpeta DSSAT (binario + datos)", value=detect_dssat_home(),
+        help="Carpeta de tu instalación de DSSAT (p. ej. C:\\DSSAT48). "
+             "Debe tener el ejecutable DSCSM0XX y las carpetas Maize/Wheat/Soybean.")
+    if not (Path(dssat_dir).exists() and
+            (list(Path(dssat_dir).glob("DSCSM*")) or list(Path(dssat_dir).glob("dscsm*")))):
+        st.warning("No encuentro el ejecutable de DSSAT en esa carpeta. "
+                   "Verificá la ruta de tu instalación.")
     crop_key = st.selectbox("Cultivo", list(CROPS),
                             format_func=lambda k: CROPS[k].name_es)
     crop = get_crop(crop_key)
